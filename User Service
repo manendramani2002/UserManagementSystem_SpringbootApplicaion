@@ -1,0 +1,114 @@
+package com.example.demo.Service;
+
+import java.util.Optional;
+
+
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationManager;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.example.demo.Entity.LoginRequest;
+import com.example.demo.Entity.RegisterDto;
+import com.example.demo.Entity.User;
+import com.example.demo.Entity.UserDto;
+import com.example.demo.Repository.UserRepository;
+import com.example.demo.config.SecurityConfig;
+
+@Service
+public class UserService implements UserDetailsService {
+
+    @Autowired
+    private UserRepository repo;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthenticationManager authenticationManager; // field injection
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = repo.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getEmail())
+                .password(user.getPassword())
+                .roles("USER")
+                .build();
+    }
+
+    public User register(RegisterDto user) {
+        if (repo.findByEmail(user.getEmail()).isPresent()) return null;
+        User u = new User();
+        u.setName(user.getName());
+        u.setEmail(user.getEmail());
+        u.setPassword(passwordEncoder.encode(user.getPassword()));
+        return repo.save(u);
+    }
+
+    public UserDto login(LoginRequest logRequest) {
+        try {
+            Authentication auth = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            logRequest.getEmail(),
+                            logRequest.getPassword()
+                    )
+            );
+
+            User user = repo.findByEmail(logRequest.getEmail()).orElse(null);
+            if (user == null) return null;
+            UserDto dto = new UserDto();
+            dto.setId(user.getId());
+            dto.setName(user.getName());
+            dto.setEmail(user.getEmail());
+            dto.setRole(user.getRole());
+            return dto;
+
+        } catch (AuthenticationException e) {
+            return null;
+        }
+    }
+
+	public User updatedetails(RegisterDto registerdto, int id) {
+		// TODO Auto-generated method stub
+		Optional<User> usr=repo.findById(id);
+		if(usr.isPresent()) {
+		if(registerdto.getName()!=null)
+		{
+		   usr.get().setName(registerdto.getName());
+		}
+		if(registerdto.getEmail()!=null)
+		{
+			usr.get().setEmail(registerdto.getEmail());
+		}
+		if(registerdto.getPassword()!=null)
+		{
+			usr.get().setPassword(passwordEncoder.encode(registerdto.getPassword()));
+		}
+		
+		}
+		return usr.get();
+		
+	}
+
+	public User findUser(int id) {
+		// TODO Auto-generated method stub
+		Optional<User> usr=repo.findById(id);
+		if(usr.isPresent())
+			return usr.get();
+		else
+		return null;
+	}
+}
